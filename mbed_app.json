@@ -1,0 +1,23 @@
+{
+    "macros": [
+        "MBEDTLS_USER_CONFIG_FILE=\"mbedtls_entropy_config.h\"",
+        "OLED_I2C_PORT=MICO_I2C_1",
+        "LPS25HB_I2C_PORT=MICO_I2C_1",
+        "MBEDTLS_SHA1_C",
+        "MBEDTLS_MD5_C",
+        "MBEDTLS_SSL_PROTO_TLS1_1",
+        "LWIP_TIMEVAL_PRIVATE=0",
+        "DONT_USE_UPLOADTOBLOB",
+        "USE_PROV_MODULE",
+        "HSM_TYPE_X509",
+        "HSM_TYPE_SYMM_KEY",
+        "USE_MBED_TLS",
+        "MBED_HEAP_STATS_ENABLED=1",
+        "MBED_STACK_STATS_ENABLED=1",
+        "DEBUG=1",
+        "TARGET_MXCHIP=1"
+    ],
+
+    "config": {
+    }
+}
