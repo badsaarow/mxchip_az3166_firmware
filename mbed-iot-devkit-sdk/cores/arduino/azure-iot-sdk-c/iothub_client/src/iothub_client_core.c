@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #include <stdlib.h>
-#include "azure_c_shared_utility/umock_c_prod.h"
+#include "umock_c/umock_c_prod.h"
 #include "azure_c_shared_utility/gballoc.h"
 
 #include <signal.h>
@@ -19,6 +19,11 @@
 #include "azure_c_shared_utility/xlogging.h"
 #include "azure_c_shared_utility/singlylinkedlist.h"
 #include "azure_c_shared_utility/vector.h"
+#include "iothub_client_options.h"
+#include "azure_c_shared_utility/tickcounter.h"
+
+
+#define DO_WORK_FREQ_DEFAULT 1
 
 struct IOTHUB_QUEUE_CONTEXT_TAG;
 
@@ -43,6 +48,8 @@ typedef struct IOTHUB_CLIENT_CORE_INSTANCE_TAG
     struct IOTHUB_QUEUE_CONTEXT_TAG* connection_status_user_context;
     struct IOTHUB_QUEUE_CONTEXT_TAG* message_user_context;
     struct IOTHUB_QUEUE_CONTEXT_TAG* method_user_context;
+    uint16_t do_work_freq_ms;
+    tickcounter_ms_t currentMessageTimeout;
 } IOTHUB_CLIENT_CORE_INSTANCE;
 
 typedef enum HTTPWORKER_THREAD_TYPE_TAG
@@ -98,8 +105,8 @@ typedef struct HTTPWORKER_THREAD_INFO_TAG
     CALLBACK_TYPE_MESSAGE,              \
     CALLBACK_TYPE_INPUTMESSAGE
 
-DEFINE_ENUM(USER_CALLBACK_TYPE, USER_CALLBACK_TYPE_VALUES)
-DEFINE_ENUM_STRINGS(USER_CALLBACK_TYPE, USER_CALLBACK_TYPE_VALUES)
+MU_DEFINE_ENUM(USER_CALLBACK_TYPE, USER_CALLBACK_TYPE_VALUES)
+MU_DEFINE_ENUM_STRINGS(USER_CALLBACK_TYPE, USER_CALLBACK_TYPE_VALUES)
 
 typedef struct DEVICE_TWIN_CALLBACK_INFO_TAG
 {
@@ -166,7 +173,7 @@ typedef struct IOTHUB_QUEUE_CONSOLIDATED_CONTEXT_TAG
     IOTHUB_CLIENT_CORE_INSTANCE* iotHubClientHandle;
 
     union USER_CALLBACK_TAG
-    { 
+    {
         IOTHUB_CLIENT_DEVICE_TWIN_CALLBACK getTwin;
     } userCallback;
 
@@ -325,7 +332,7 @@ static int make_method_calback_queue_context(USER_CALLBACK_INFO* queue_cb_info, 
     {
         /* Codes_SRS_IOTHUB_MQTT_TRANSPORT_07_003: [ If a failure is encountered IOTHUB_CLIENT_INBOUND_DEVICE_METHOD_CALLBACK shall return a non-NULL value. ]*/
         LogError("STRING_construct failed");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -334,7 +341,7 @@ static int make_method_calback_queue_context(USER_CALLBACK_INFO* queue_cb_info, 
             STRING_delete(queue_cb_info->iothub_callback.method_cb_info.method_name);
             /* Codes_SRS_IOTHUB_MQTT_TRANSPORT_07_003: [ If a failure is encountered IOTHUB_CLIENT_INBOUND_DEVICE_METHOD_CALLBACK shall return a non-NULL value. ]*/
             LogError("BUFFER_create failed");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -348,7 +355,7 @@ static int make_method_calback_queue_context(USER_CALLBACK_INFO* queue_cb_info, 
                 BUFFER_delete(queue_cb_info->iothub_callback.method_cb_info.payload);
                 /* Codes_SRS_IOTHUB_MQTT_TRANSPORT_07_003: [ If a failure is encountered IOTHUB_CLIENT_INBOUND_DEVICE_METHOD_CALLBACK shall return a non-NULL value. ]*/
                 LogError("VECTOR_push_back failed");
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
         }
     }
@@ -362,7 +369,7 @@ static int iothub_ll_device_method_callback(const char* method_name, const unsig
     if (userContextCallback == NULL)
     {
         LogError("invalid parameter userContextCallback(NULL)");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -375,7 +382,7 @@ static int iothub_ll_device_method_callback(const char* method_name, const unsig
         if (result != 0)
         {
             LogError("construction of method calback queue context failed");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
     }
     return result;
@@ -388,7 +395,7 @@ static int iothub_ll_inbound_device_method_callback(const char* method_name, con
     if (userContextCallback == NULL)
     {
         LogError("invalid parameter userContextCallback(NULL)");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -401,7 +408,7 @@ static int iothub_ll_inbound_device_method_callback(const char* method_name, con
         if (result != 0)
         {
             LogError("construction of method calback queue context failed");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
     }
     return result;
@@ -485,7 +492,7 @@ static void iothub_ll_device_twin_callback(DEVICE_TWIN_UPDATE_STATE update_state
             {
                 LogError("failure allocating payload in device twin callback.");
                 queue_cb_info.iothub_callback.dev_twin_cb_info.size = 0;
-                push_to_vector = __FAILURE__;
+                push_to_vector = MU_FAILURE;
             }
             else
             {
@@ -742,7 +749,7 @@ static void dispatch_user_callbacks(IOTHUB_CLIENT_CORE_INSTANCE* iotHubClientIns
                 break;
 
             default:
-                LogError("Invalid callback type '%s'", ENUM_TO_STRING(USER_CALLBACK_TYPE, queued_cb->type));
+                LogError("Invalid callback type '%s'", MU_ENUM_TO_STRING(USER_CALLBACK_TYPE, queued_cb->type));
                 break;
             }
         }
@@ -778,7 +785,7 @@ static void ScheduleWork_Thread_ForMultiplexing(void* iotHubClientHandle)
 static int ScheduleWork_Thread(void* threadArgument)
 {
     IOTHUB_CLIENT_CORE_INSTANCE* iotHubClientInstance = (IOTHUB_CLIENT_CORE_INSTANCE*)threadArgument;
-
+    uint16_t sleeptime_in_ms = DO_WORK_FREQ_DEFAULT;
     while (1)
     {
         if (Lock(iotHubClientInstance->LockHandle) == LOCK_OK)
@@ -791,12 +798,13 @@ static int ScheduleWork_Thread(void* threadArgument)
             }
             else
             {
-                /* Codes_SRS_IOTHUBCLIENT_01_037: [The thread created by IoTHubClient_SendEvent or IoTHubClient_SetMessageCallback shall call IoTHubClientCore_LL_DoWork every 1 ms.] */
+                /* Codes_SRS_IOTHUBCLIENT_01_037: [The thread created by IoTHubClient_SendEvent or IoTHubClient_SetMessageCallback shall call IoTHubClientCore_LL_DoWork every 1 ms by default.] */
                 /* Codes_SRS_IOTHUBCLIENT_01_039: [All calls to IoTHubClientCore_LL_DoWork shall be protected by the lock created in IotHubClient_Create.] */
                 IoTHubClientCore_LL_DoWork(iotHubClientInstance->IoTHubClientLLHandle);
 
                 garbageCollectorImpl(iotHubClientInstance);
                 VECTOR_HANDLE call_backs = VECTOR_move(iotHubClientInstance->saved_user_callback_list);
+                sleeptime_in_ms = iotHubClientInstance->do_work_freq_ms; // Update the sleepval within the locked thread.
                 (void)Unlock(iotHubClientInstance->LockHandle);
                 if (call_backs == NULL)
                 {
@@ -806,6 +814,8 @@ static int ScheduleWork_Thread(void* threadArgument)
                 {
                     dispatch_user_callbacks(iotHubClientInstance, call_backs);
                 }
+
+
             }
         }
         else
@@ -813,7 +823,8 @@ static int ScheduleWork_Thread(void* threadArgument)
             /*Codes_SRS_IOTHUBCLIENT_01_040: [If acquiring the lock fails, IoTHubClientCore_LL_DoWork shall not be called.]*/
             /*no code, shall retry*/
         }
-        (void)ThreadAPI_Sleep(1);
+        /* Codes_SRS_IOTHUBCLIENT_041_02: [The thread shall sleep for a specified time in ms as provided through IoTHubClientCore_SetOption, with a default of 1 ms ] */
+        (void)ThreadAPI_Sleep(sleeptime_in_ms);
     }
 
     ThreadAPI_Exit(0);
@@ -864,6 +875,11 @@ static IOTHUB_CLIENT_CORE_INSTANCE* create_iothub_instance(CREATE_HUB_INSTANCE_T
     if (result != NULL)
     {
         memset((void *)result, 0, sizeof(IOTHUB_CLIENT_CORE_INSTANCE));
+
+        /* Codes_SRS_IOTHUBCLIENT_41_02 [] */
+        result->do_work_freq_ms = DO_WORK_FREQ_DEFAULT;
+        /* Default currentMessageTimeout to NULL until it is set by SetOption */
+        result->currentMessageTimeout = 0;
 
         /* Codes_SRS_IOTHUBCLIENT_01_029: [IoTHubClient_Create shall create a lock object to be used later for serializing IoTHubClient calls.] */
         if ((result->saved_user_callback_list = VECTOR_create(sizeof(USER_CALLBACK_INFO))) == NULL)
@@ -1691,13 +1707,61 @@ IOTHUB_CLIENT_RESULT IoTHubClientCore_SetOption(IOTHUB_CLIENT_CORE_HANDLE iotHub
         }
         else
         {
-            /*Codes_SRS_IOTHUBCLIENT_02_038: [If optionName doesn't match one of the options handled by this module then IoTHubClient_SetOption shall call IoTHubClientCore_LL_SetOption passing the same parameters and return what IoTHubClientCore_LL_SetOption returns.] */
-            result = IoTHubClientCore_LL_SetOption(iotHubClientInstance->IoTHubClientLLHandle, optionName, value);
-            if (result != IOTHUB_CLIENT_OK)
+            /* Codes_SRS_IOTHUBCLIENT_41_001 [ If parameter `optionName` is `OPTION_DO_WORK_FREQUENCY_IN_MS` then `IoTHubClient_SetOption` shall set `do_work_freq_ms` parameter of `IoTHubClientInstance` ]*/
+            if (strcmp(OPTION_DO_WORK_FREQUENCY_IN_MS, optionName) == 0)
             {
-                LogError("IoTHubClientCore_LL_SetOption failed");
+                /* Codes_SRS_IOTHUBCLIENT_41_003: [ The value for `OPTION_DO_WORK_FREQUENCY_IN_MS` shall be limited to 100 to follow SDK best practices by not reducing the DoWork frequency below 10 Hz ]*/
+                if (0 < *(uint16_t*)value && *(uint16_t*)value <= 100)
+                {
+                    /* Codes_SRS_IOTHUBCLIENT_41_004: [ If `currentMessageTimeout` is not less than `do_work_freq_ms`, `IotHubClientCore_SetOption` shall return `IOTHUB_CLIENT_ERROR` ]*/
+                    if ((!iotHubClientInstance->currentMessageTimeout) || ( *((tickcounter_ms_t*)value) < iotHubClientInstance->currentMessageTimeout))
+                    {
+                        iotHubClientInstance->do_work_freq_ms = *((uint16_t *)value);
+                        result = IOTHUB_CLIENT_OK;
+                    }
+                    else
+                    {
+                        result = IOTHUB_CLIENT_ERROR;
+                        LogError("Invalid value: OPTION_DO_WORK_FREQUENCY_IN_MS cannot exceed that of OPTION_MESSAGE_TIMEOUT.");
+                    }
+                }
+                else
+                {
+                    result = IOTHUB_CLIENT_ERROR;
+                    LogError("Invalid value: OPTION_DO_WORK_FREQUENCY_IN_MS cannot exceed 100 ms. If you wish to reduce the frequency further, consider using the LL layer.");
+                }
             }
+            /* Codes_SRS_IOTHUBCLIENT_41_005: [ If parameter `optionName` is `OPTION_MESSAGE_TIMEOUT` then `IoTHubClientCore_SetOption` shall set `currentMessageTimeout` parameter of `IoTHubClientInstance` ]*/
+            else if (strcmp(OPTION_MESSAGE_TIMEOUT, optionName) == 0)
+            {
+                tickcounter_ms_t foo = (tickcounter_ms_t)(*(tickcounter_ms_t*)value);
+                iotHubClientInstance->currentMessageTimeout = foo;
 
+                /* Codes_SRS_IOTHUBCLIENT_41_004: [ If `currentMessageTimeout` is not less than `do_work_freq_ms`, `IotHubClientCore_SetOption` shall return `IOTHUB_CLIENT_ERROR` ]*/
+				if ((tickcounter_ms_t)iotHubClientInstance->do_work_freq_ms < iotHubClientInstance->currentMessageTimeout)
+                {
+                    /*Codes_SRS_IOTHUBCLIENT_41_006: [ If parameter `optionName` is `OPTION_MESSAGE_TIMEOUT` then `IoTHubClientCore_SetOption` shall call `IoTHubClientCore_LL_SetOption` passing the same parameters and return what IoTHubClientCore_LL_SetOption returns. ] */
+                    result = IoTHubClientCore_LL_SetOption(iotHubClientInstance->IoTHubClientLLHandle, optionName, value);
+                    if (result != IOTHUB_CLIENT_OK)
+                    {
+                        LogError("IoTHubClientCore_LL_SetOption failed");
+                    }
+                }
+                else
+                {
+                    result = IOTHUB_CLIENT_ERROR;
+                    LogError("invalid value: OPTION_MESSAGE_TIMEOUT cannot exceed the value of OPTION_DO_WORK_FREQUENCY_IN_MS ");
+                }
+            }
+            else
+            {
+                /*Codes_SRS_IOTHUBCLIENT_02_038: [If optionName doesn't match one of the options handled by this module then IoTHubClient_SetOption shall call IoTHubClientCore_LL_SetOption passing the same parameters and return what IoTHubClientCore_LL_SetOption returns.] */
+                result = IoTHubClientCore_LL_SetOption(iotHubClientInstance->IoTHubClientLLHandle, optionName, value);
+                if (result != IOTHUB_CLIENT_OK)
+                {
+                    LogError("IoTHubClientCore_LL_SetOption failed");
+                }
+            }
             (void)Unlock(iotHubClientInstance->LockHandle);
         }
     }

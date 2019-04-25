@@ -8,11 +8,11 @@
 #ifndef IOTHUB_CLIENT_PROVISIONING_H
 #define IOTHUB_CLIENT_PROVISIONING_H
 
-#include "azure_c_shared_utility/macro_utils.h"
-#include "azure_c_shared_utility/umock_c_prod.h"
+#include "azure_macro_utils/macro_utils.h"
+#include "umock_c/umock_c_prod.h"
 
 #ifdef USE_PROV_MODULE
-#include "azure_prov_client/iothub_auth_client.h"
+#include "azure_prov_client/internal/iothub_auth_client.h"
 #endif
 
 #include "iothub_client_ll.h"

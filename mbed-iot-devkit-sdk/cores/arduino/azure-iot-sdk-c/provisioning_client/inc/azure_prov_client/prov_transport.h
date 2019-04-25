@@ -4,8 +4,8 @@
 #ifndef PROV_TRANSPORT_H
 #define PROV_TRANSPORT_H
 
-#include "azure_c_shared_utility/umock_c_prod.h"
-#include "azure_c_shared_utility/macro_utils.h"
+#include "umock_c/umock_c_prod.h"
+#include "azure_macro_utils/macro_utils.h"
 #include "azure_c_shared_utility/shared_util_options.h"
 #include "azure_c_shared_utility/buffer_.h"
 
@@ -25,14 +25,14 @@ extern "C" {
     TRANSPORT_HSM_TYPE_X509,        \
     TRANSPORT_HSM_TYPE_SYMM_KEY
 
-    DEFINE_ENUM(TRANSPORT_HSM_TYPE, TRANSPORT_HSM_TYPE_VALUES);
+    MU_DEFINE_ENUM(TRANSPORT_HSM_TYPE, TRANSPORT_HSM_TYPE_VALUES);
 
 #define PROV_DEVICE_TRANSPORT_RESULT_VALUES     \
     PROV_DEVICE_TRANSPORT_RESULT_OK,            \
     PROV_DEVICE_TRANSPORT_RESULT_UNAUTHORIZED,  \
     PROV_DEVICE_TRANSPORT_RESULT_ERROR
 
-    DEFINE_ENUM(PROV_DEVICE_TRANSPORT_RESULT, PROV_DEVICE_TRANSPORT_RESULT_VALUES);
+    MU_DEFINE_ENUM(PROV_DEVICE_TRANSPORT_RESULT, PROV_DEVICE_TRANSPORT_RESULT_VALUES);
 
 #ifdef __cplusplus
 }

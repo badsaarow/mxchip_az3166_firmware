@@ -4,8 +4,8 @@
 #ifndef PROV_DEVICE_LL_CLIENT_H
 #define PROV_DEVICE_LL_CLIENT_H
 
-#include "azure_c_shared_utility/umock_c_prod.h"
-#include "azure_c_shared_utility/macro_utils.h"
+#include "umock_c/umock_c_prod.h"
+#include "azure_macro_utils/macro_utils.h"
 #include "azure_prov_client/prov_transport.h"
 
 #ifdef __cplusplus
@@ -30,7 +30,7 @@ typedef struct PROV_INSTANCE_INFO_TAG* PROV_DEVICE_LL_HANDLE;
     PROV_DEVICE_RESULT_UNAUTHORIZED,        \
     PROV_DEVICE_RESULT_DISABLED
 
-DEFINE_ENUM(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
+MU_DEFINE_ENUM(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
 
 #define PROV_DEVICE_REG_STATUS_VALUES      \
     PROV_DEVICE_REG_STATUS_CONNECTED,      \
@@ -40,7 +40,7 @@ DEFINE_ENUM(PROV_DEVICE_RESULT, PROV_DEVICE_RESULT_VALUE);
     PROV_DEVICE_REG_STATUS_ERROR,          \
     PROV_DEVICE_REG_HUB_NOT_SPECIFIED
 
-DEFINE_ENUM(PROV_DEVICE_REG_STATUS, PROV_DEVICE_REG_STATUS_VALUES);
+MU_DEFINE_ENUM(PROV_DEVICE_REG_STATUS, PROV_DEVICE_REG_STATUS_VALUES);
 
 static const char* const PROV_REGISTRATION_ID = "registration_id";
 static const char* const PROV_OPTION_LOG_TRACE = "logtrace";
