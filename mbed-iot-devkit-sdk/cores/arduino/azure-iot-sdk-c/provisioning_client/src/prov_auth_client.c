@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #include <stdlib.h>
-#include "azure_c_shared_utility/umock_c_prod.h"
+#include "umock_c/umock_c_prod.h"
 #include "azure_c_shared_utility/gballoc.h"
 #include "azure_c_shared_utility/xlogging.h"
-#include "azure_c_shared_utility/base64.h"
+#include "azure_c_shared_utility/azure_base64.h"
 #include "azure_c_shared_utility/base32.h"
 #include "azure_c_shared_utility/urlencode.h"
 #include "azure_c_shared_utility/sha.h"
@@ -91,24 +91,24 @@ static int load_registration_id(PROV_AUTH_INFO* handle)
         if (handle->hsm_client_get_endorsement_key(handle->hsm_client_handle, &endorsement_key, &ek_len) != 0)
         {
             LogError("Failed getting device reg id");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
             if (SHA256Reset(&sha_ctx) != 0)
             {
                 LogError("Failed sha256 reset");
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else if (SHA256Input(&sha_ctx, endorsement_key, (unsigned int)ek_len) != 0)
             {
                 LogError("Failed SHA256Input");
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else if (SHA256Result(&sha_ctx, msg_digest) != 0)
             {
                 LogError("Failed SHA256Result");
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else
             {
@@ -116,7 +116,7 @@ static int load_registration_id(PROV_AUTH_INFO* handle)
                 if (handle->registration_id == NULL)
                 {
                     LogError("Failed allocating registration Id");
-                    result = __FAILURE__;
+                    result = MU_FAILURE;
                 }
                 else
                 {
@@ -132,7 +132,7 @@ static int load_registration_id(PROV_AUTH_INFO* handle)
         if (handle->registration_id == NULL)
         {
             LogError("Failed getting common name from certificate");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -151,7 +151,7 @@ static int sign_sas_data(PROV_AUTH_INFO* auth_info, const char* payload, unsigne
         if (auth_info->hsm_client_sign_data(auth_info->hsm_client_handle, (const unsigned char*)payload, strlen(payload), output, len) != 0)
         {
             LogError("Failed signing data");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -160,34 +160,34 @@ static int sign_sas_data(PROV_AUTH_INFO* auth_info, const char* payload, unsigne
     }
     else
     {
+        BUFFER_HANDLE decoded_key = NULL;
+        BUFFER_HANDLE output_hash = NULL;
+
         char* symmetrical_key = auth_info->hsm_client_get_symm_key(auth_info->hsm_client_handle);
         if (symmetrical_key == NULL)
         {
             LogError("Failed getting asymmetrical key");
-            result = __FAILURE__;
+            result = MU_FAILURE;
+        }
+        else if ((decoded_key = Azure_Base64_Decode(symmetrical_key)) == NULL)
+        {
+            LogError("Failed decoding symmetrical key");
+            result = MU_FAILURE;
+        }
+        else if ((output_hash = BUFFER_new()) == NULL)
+        {
+            LogError("Failed allocating output hash buffer");
+            result = MU_FAILURE;
         }
         else
         {
-            BUFFER_HANDLE decoded_key;
-            BUFFER_HANDLE output_hash;
+            size_t decoded_key_len = BUFFER_length(decoded_key);
+            const unsigned char* decoded_key_bytes = BUFFER_u_char(decoded_key);
 
-            if ((decoded_key = Base64_Decoder(symmetrical_key)) == NULL)
-            {
-                LogError("Failed decoding symmetrical key");
-                result = __FAILURE__;
-            }
-            else if ((output_hash = BUFFER_new()) == NULL)
-            {
-                LogError("Failed allocating output hash buffer");
-                BUFFER_delete(decoded_key);
-                result = __FAILURE__;
-            }
-            else if (HMACSHA256_ComputeHash(BUFFER_u_char(decoded_key), BUFFER_length(decoded_key), (const unsigned char*)payload, payload_len, output_hash) != HMACSHA256_OK)
+            if (HMACSHA256_ComputeHash(decoded_key_bytes, decoded_key_len, (const unsigned char*)payload, payload_len, output_hash) != HMACSHA256_OK)
             {
                 LogError("Failed computing HMAC Hash");
-                BUFFER_delete(decoded_key);
-                BUFFER_delete(output_hash);
-                result = __FAILURE__;
+                result = MU_FAILURE;
             }
             else
             {
@@ -195,7 +195,7 @@ static int sign_sas_data(PROV_AUTH_INFO* auth_info, const char* payload, unsigne
                 if ( (*output = malloc(*len)) == NULL)
                 {
                     LogError("Failed allocating output buffer");
-                    result = __FAILURE__;
+                    result = MU_FAILURE;
                 }
                 else
                 {
@@ -203,11 +203,13 @@ static int sign_sas_data(PROV_AUTH_INFO* auth_info, const char* payload, unsigne
                     memcpy(*output, output_data, *len);
                     result = 0;
                 }
-                BUFFER_delete(decoded_key);
-                BUFFER_delete(output_hash);
+
             }
-            free(symmetrical_key);
         }
+
+        BUFFER_delete(decoded_key);
+        BUFFER_delete(output_hash);
+        free(symmetrical_key);
     }
     return result;
 }
@@ -224,9 +226,9 @@ PROV_AUTH_HANDLE prov_auth_create()
     {
         memset(result, 0, sizeof(PROV_AUTH_INFO) );
         SECURE_DEVICE_TYPE sec_type = prov_dev_security_get_type();
+#if defined(HSM_TYPE_SAS_TOKEN)  || defined(HSM_AUTH_TYPE_CUSTOM)
         if (sec_type == SECURE_DEVICE_TYPE_TPM)
         {
-#if defined(HSM_TYPE_SAS_TOKEN)  || defined(HSM_AUTH_TYPE_CUSTOM)
             /* Codes_SRS_PROV_AUTH_CLIENT_07_003: [ prov_auth_create shall validate the specified secure enclave interface to ensure. ] */
             result->sec_type = PROV_AUTH_TYPE_TPM;
             const HSM_CLIENT_TPM_INTERFACE* tpm_interface = hsm_client_tpm_interface();
@@ -244,15 +246,11 @@ PROV_AUTH_HANDLE prov_auth_create()
                 free(result);
                 result = NULL;
             }
-#else
-            LogError("Invalid secure device type was specified: SECURE_DEVICE_TYPE_TPM (%d)", SECURE_DEVICE_TYPE_TPM);
-            free(result);
-            result = NULL;
-#endif
         }
-        else if (sec_type == SECURE_DEVICE_TYPE_X509)
-        {
+#endif
 #if defined(HSM_TYPE_X509) || defined(HSM_AUTH_TYPE_CUSTOM)
+        if (sec_type == SECURE_DEVICE_TYPE_X509)
+        {
             /* Codes_SRS_PROV_AUTH_CLIENT_07_003: [ prov_auth_create shall validate the specified secure enclave interface to ensure. ] */
             result->sec_type = PROV_AUTH_TYPE_X509;
             const HSM_CLIENT_X509_INTERFACE* x509_interface = hsm_client_x509_interface();
@@ -268,15 +266,11 @@ PROV_AUTH_HANDLE prov_auth_create()
                 free(result);
                 result = NULL;
             }
-#else
-            LogError("Invalid secure device type was specified: HSM_TYPE_X509 (%d)", HSM_TYPE_X509);
-            free(result);
-            result = NULL;
-#endif
         }
-        else
+#endif
+#if defined(HSM_TYPE_SYMM_KEY) || defined(HSM_AUTH_TYPE_CUSTOM)
+        if (sec_type == SECURE_DEVICE_TYPE_SYMMETRIC_KEY)
         {
-#if defined(HSM_TYPE_SYMM_KEY)
             result->sec_type = PROV_AUTH_TYPE_KEY;
             const HSM_CLIENT_KEY_INTERFACE* key_interface = hsm_client_key_interface();
             if ((key_interface == NULL) ||
@@ -291,13 +285,20 @@ PROV_AUTH_HANDLE prov_auth_create()
                 free(result);
                 result = NULL;
             }
-#else
-            LogError("Invalid secure device type was specified");
-            result = NULL;
-#endif
         }
+#endif
 
-        if (result != NULL)
+        if (result == NULL)
+        {
+            LogError("Error allocating result or else unsupported security type %d", sec_type);
+        }
+        else if (result->hsm_client_create == NULL)
+        {
+            LogError("hsm_client_create is not a valid address");
+            free(result);
+            result = NULL;
+        }
+        else
         {
             /* Codes_SRS_PROV_AUTH_CLIENT_07_004: [ prov_auth_create shall call hsm_client_create on the secure enclave interface. ] */
             if ((result->hsm_client_handle = result->hsm_client_create() ) == NULL)
@@ -399,19 +400,19 @@ int prov_auth_set_registration_id(PROV_AUTH_HANDLE handle, const char* registrat
     if (handle == NULL || registration_id == NULL)
     {
         LogError("Invalid parameter handle: %p, registration_id: %p", handle, registration_id);
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
         if (handle->registration_id != NULL)
         {
             LogError("Registration_id has been previously set, registration can not be changed");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if (mallocAndStrcpy_s(&handle->registration_id, registration_id) != 0)
         {
             LogError("Failed allocating registration key");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -506,13 +507,13 @@ int prov_auth_import_key(PROV_AUTH_HANDLE handle, const unsigned char* key_value
     {
         /* Codes_SRS_SECURE_ENCLAVE_CLIENT_07_027: [ If handle or key are NULL prov_auth_import_key shall return a non-zero value. ] */
         LogError("Invalid handle parameter");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else if (handle->sec_type != PROV_AUTH_TYPE_TPM)
     {
         /* Codes_SRS_SECURE_ENCLAVE_CLIENT_07_029: [ If the sec_type is not SECURE_ENCLAVE_TYPE_TPM, prov_auth_import_key shall return NULL. ] */
         LogError("Invalid type for operation");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -521,7 +522,7 @@ int prov_auth_import_key(PROV_AUTH_HANDLE handle, const unsigned char* key_value
         {
             /* SRS_SECURE_ENCLAVE_CLIENT_07_040: [ If hsm_client_import_key returns an error prov_auth_import_key shall return a non-zero value. ]*/
             LogError("failure importing key into tpm");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -572,7 +573,7 @@ char* prov_auth_construct_sas_token(PROV_AUTH_HANDLE handle, const char* token_s
                 STRING_HANDLE urlEncodedSignature;
                 STRING_HANDLE base64Signature;
                 STRING_HANDLE sas_token_handle;
-                if ((base64Signature = Base64_Encode_Bytes(data_value, data_len)) == NULL)
+                if ((base64Signature = Azure_Base64_Encode_Bytes(data_value, data_len)) == NULL)
                 {
                     result = NULL;
                     LogError("Failure constructing base64 encoding.");
@@ -662,68 +663,3 @@ char* prov_auth_get_alias_key(PROV_AUTH_HANDLE handle)
     }
     return result;
 }
-
-#if 0
-char* prov_auth_get_signer_cert(PROV_AUTH_HANDLE handle)
-{
-    char* result;
-    if (handle == NULL)
-    {
-        /* Codes_SRS_SECURE_ENCLAVE_CLIENT_07_036: [ If handle or key are NULL prov_auth_get_signer_cert shall return a non-zero value. ] */
-        LogError("Invalid handle parameter");
-        result = NULL;
-    }
-    else if (handle->sec_type != PROV_AUTH_TYPE_X509)
-    {
-        /* Codes_SRS_SECURE_ENCLAVE_CLIENT_07_038: [ If the sec_type is not PROV_AUTH_TYPE_X509, prov_auth_get_signer_cert shall return NULL. ] */
-        LogError("Invalid type for operation");
-        result = NULL;
-    }
-    else
-    {
-        /* Codes_SRS_SECURE_ENCLAVE_CLIENT_07_037: [ prov_auth_get_signer_cert shall import the specified signer cert into the client using hsm_client_get_signer_cert secure enclave function. ] */
-        result = handle->hsm_client_get_signer_cert(handle->sec_dev_handle);
-    }
-    return result;
-}
-
-char* prov_auth_get_root_cert(PROV_AUTH_HANDLE handle)
-{
-    char* result;
-    if (handle == NULL)
-    {
-        LogError("Invalid handle parameter");
-        result = NULL;
-    }
-    else if (handle->sec_type != PROV_AUTH_TYPE_X509)
-    {
-        LogError("Invalid type for operation");
-        result = NULL;
-    }
-    else
-    {
-        result = handle->hsm_client_get_root_cert(handle->sec_dev_handle);
-    }
-    return result;
-}
-
-char* prov_auth_get_root_key(PROV_AUTH_HANDLE handle)
-{
-    char* result;
-    if (handle == NULL)
-    {
-        LogError("Invalid handle parameter");
-        result = NULL;
-    }
-    else if (handle->sec_type != PROV_AUTH_TYPE_X509)
-    {
-        LogError("Invalid type for operation");
-        result = NULL;
-    }
-    else
-    {
-        result = handle->hsm_client_get_root_key(handle->sec_dev_handle);
-    }
-    return result;
-}
-#endif

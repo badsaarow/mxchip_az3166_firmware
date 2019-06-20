@@ -37,23 +37,23 @@
 #include "internal/iothub_client_edge.h"
 #endif
 
-#define LOG_ERROR_RESULT LogError("result = %s", ENUM_TO_STRING(IOTHUB_CLIENT_RESULT, result));
+#define LOG_ERROR_RESULT LogError("result = %s", MU_ENUM_TO_STRING(IOTHUB_CLIENT_RESULT, result));
 #define INDEFINITE_TIME ((time_t)(-1))
 
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_FILE_UPLOAD_RESULT, IOTHUB_CLIENT_FILE_UPLOAD_RESULT_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_RESULT, IOTHUB_CLIENT_RESULT_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_RETRY_POLICY, IOTHUB_CLIENT_RETRY_POLICY_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_STATUS, IOTHUB_CLIENT_STATUS_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_IDENTITY_TYPE, IOTHUB_IDENTITY_TYPE_VALUE);
-DEFINE_ENUM_STRINGS(IOTHUB_PROCESS_ITEM_RESULT, IOTHUB_PROCESS_ITEM_RESULT_VALUE);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_IOTHUB_METHOD_STATUS, IOTHUB_CLIENT_IOTHUB_METHOD_STATUS_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_CONFIRMATION_RESULT, IOTHUB_CLIENT_CONFIRMATION_RESULT_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_CONNECTION_STATUS, IOTHUB_CLIENT_CONNECTION_STATUS_VALUES);
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_CONNECTION_STATUS_REASON, IOTHUB_CLIENT_CONNECTION_STATUS_REASON_VALUES);
-DEFINE_ENUM_STRINGS(TRANSPORT_TYPE, TRANSPORT_TYPE_VALUES);
-DEFINE_ENUM_STRINGS(DEVICE_TWIN_UPDATE_STATE, DEVICE_TWIN_UPDATE_STATE_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_FILE_UPLOAD_RESULT, IOTHUB_CLIENT_FILE_UPLOAD_RESULT_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_RESULT, IOTHUB_CLIENT_RESULT_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_RETRY_POLICY, IOTHUB_CLIENT_RETRY_POLICY_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_STATUS, IOTHUB_CLIENT_STATUS_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_IDENTITY_TYPE, IOTHUB_IDENTITY_TYPE_VALUE);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_PROCESS_ITEM_RESULT, IOTHUB_PROCESS_ITEM_RESULT_VALUE);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_IOTHUB_METHOD_STATUS, IOTHUB_CLIENT_IOTHUB_METHOD_STATUS_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_CONFIRMATION_RESULT, IOTHUB_CLIENT_CONFIRMATION_RESULT_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_CONNECTION_STATUS, IOTHUB_CLIENT_CONNECTION_STATUS_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_CONNECTION_STATUS_REASON, IOTHUB_CLIENT_CONNECTION_STATUS_REASON_VALUES);
+MU_DEFINE_ENUM_STRINGS(TRANSPORT_TYPE, TRANSPORT_TYPE_VALUES);
+MU_DEFINE_ENUM_STRINGS(DEVICE_TWIN_UPDATE_STATE, DEVICE_TWIN_UPDATE_STATE_VALUES);
 #ifndef DONT_USE_UPLOADTOBLOB
-DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_FILE_UPLOAD_GET_DATA_RESULT, IOTHUB_CLIENT_FILE_UPLOAD_GET_DATA_RESULT_VALUES);
+MU_DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_FILE_UPLOAD_GET_DATA_RESULT, IOTHUB_CLIENT_FILE_UPLOAD_GET_DATA_RESULT_VALUES);
 #endif // DONT_USE_UPLOADTOBLOB
 
 #define CALLBACK_TYPE_VALUES \
@@ -61,8 +61,8 @@ DEFINE_ENUM_STRINGS(IOTHUB_CLIENT_FILE_UPLOAD_GET_DATA_RESULT, IOTHUB_CLIENT_FIL
     CALLBACK_TYPE_SYNC,    \
     CALLBACK_TYPE_ASYNC
 
-DEFINE_ENUM(CALLBACK_TYPE, CALLBACK_TYPE_VALUES)
-DEFINE_ENUM_STRINGS(CALLBACK_TYPE, CALLBACK_TYPE_VALUES)
+MU_DEFINE_ENUM(CALLBACK_TYPE, CALLBACK_TYPE_VALUES)
+MU_DEFINE_ENUM_STRINGS(CALLBACK_TYPE, CALLBACK_TYPE_VALUES)
 
 typedef struct IOTHUB_METHOD_CALLBACK_DATA_TAG
 {
@@ -180,7 +180,7 @@ static int retrieve_edge_environment_variabes(EDGE_ENVIRONMENT_VARIABLES *edge_e
         if ((edge_environment_variables->ca_trusted_certificate_file = environment_get_variable(ENVIRONMENT_VAR_EDGEHUB_CACERTIFICATEFILE)) == NULL)
         {
             LogError("Environment variable %s is missing.  When %s is set, it is required", ENVIRONMENT_VAR_EDGEHUB_CACERTIFICATEFILE, ENVIRONMENT_VAR_EDGEHUB_CONNECTIONSTRING);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -195,49 +195,49 @@ static int retrieve_edge_environment_variabes(EDGE_ENVIRONMENT_VARIABLES *edge_e
         if ((edge_environment_variables->auth_scheme = environment_get_variable(ENVIRONMENT_VAR_EDGEAUTHSCHEME)) == NULL)
         {
             LogError("Environment %s not set", ENVIRONMENT_VAR_EDGEAUTHSCHEME);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if (strcmp(edge_environment_variables->auth_scheme, SAS_TOKEN_AUTH) != 0)
         {
             LogError("Environment %s was set to %s, but only support for %s", ENVIRONMENT_VAR_EDGEAUTHSCHEME, edge_environment_variables->auth_scheme, SAS_TOKEN_AUTH);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if ((edge_environment_variables->device_id = environment_get_variable(ENVIRONMENT_VAR_EDGEDEVICEID)) == NULL)
         {
             LogError("Environment %s not set", ENVIRONMENT_VAR_EDGEDEVICEID);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if ((edgehubhostname = environment_get_variable(ENVIRONMENT_VAR_EDGEHUBHOSTNAME)) == NULL)
         {
             LogError("Environment %s not set", ENVIRONMENT_VAR_EDGEHUBHOSTNAME);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if ((edge_environment_variables->gatewayhostname = environment_get_variable(ENVIRONMENT_VAR_EDGEGATEWAYHOST)) == NULL)
         {
             LogError("Environment %s not set", ENVIRONMENT_VAR_EDGEGATEWAYHOST);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if ((edge_environment_variables->module_id = environment_get_variable(ENVIRONMENT_VAR_EDGEMODULEID)) == NULL)
         {
             LogError("Environment %s not set", ENVIRONMENT_VAR_EDGEMODULEID);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         // Make a copy of just ENVIRONMENT_VAR_EDGEHUBHOSTNAME.  We need to make changes in place (namely inserting a '\0')
         // and can't do this with system environment variable safely.
         else if (mallocAndStrcpy_s(&edge_environment_variables->iothub_buffer, edgehubhostname) != 0)
         {
             LogError("Unable to copy buffer");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if ((edgehubhostname_separator = strchr(edge_environment_variables->iothub_buffer, '.')) == NULL)
         {
             LogError("Environment edgehub %s invalid, requires '.' separator", edge_environment_variables->iothub_buffer);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else if (*(edgehubhostname_separator + 1) == 0)
         {
             LogError("Environment edgehub %s invalid, no content after '.' separator", edge_environment_variables->iothub_buffer);
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -329,7 +329,7 @@ static bool is_event_equal_for_match(LIST_ITEM_HANDLE list_item, const void* mat
 
 static void device_twin_data_destroy(IOTHUB_DEVICE_TWIN* client_item)
 {
-    CONSTBUFFER_Destroy(client_item->report_data_handle);
+    CONSTBUFFER_DecRef(client_item->report_data_handle);
     free(client_item);
 }
 
@@ -353,7 +353,7 @@ static int create_edge_handle(IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handle_data, co
         if (handle_data->methodHandle == NULL)
         {
             LogError("Unable to IoTHubModuleClient_LL_MethodHandle_Create");
-            result = __FAILURE__;
+            result = MU_FAILURE;
         }
         else
         {
@@ -382,7 +382,7 @@ static int create_blob_upload_module(IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handle_d
     if (handle_data->uploadToBlobHandle == NULL)
     {
         LogError("unable to IoTHubClientCore_LL_UploadToBlob_Create");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -465,7 +465,7 @@ static bool invoke_message_callback(IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handleDat
 static STRING_HANDLE make_product_info(const char* product)
 {
     STRING_HANDLE result;
-    STRING_HANDLE pfi = platform_get_platform_info();
+    STRING_HANDLE pfi = platform_get_platform_info(PLATFORM_INFO_OPTION_DEFAULT);
     if (pfi == NULL)
     {
         result = NULL;
@@ -720,7 +720,7 @@ static int IoTHubClientCore_LL_DeviceMethodComplete(const char* method_name, con
     {
         /* Codes_SRS_IOTHUBCLIENT_LL_07_017: [ If handle or response is NULL then IoTHubClientCore_LL_DeviceMethodComplete shall return 500. ] */
         LogError("Invalid argument ctx=%p", ctx);
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {
@@ -740,7 +740,7 @@ static int IoTHubClientCore_LL_DeviceMethodComplete(const char* method_name, con
                 }
                 else
                 {
-                    result = __FAILURE__;
+                    result = MU_FAILURE;
                 }
                 if (payload_resp != NULL)
                 {
@@ -1477,6 +1477,11 @@ IOTHUB_CLIENT_CORE_LL_HANDLE IoTHubClientCore_LL_CreateFromConnectionString(cons
                                     break;
                                 }
                             }
+                            else
+                            {
+                                // If we get an unknown token, log it to error stream but do not cause a fatal error.
+                                LogError("Unknown token <%s> in connection string.  Ignoring error and continuing to parse", s_token);
+                            }
                         }
                     }
                 }
@@ -1749,7 +1754,7 @@ static int attach_ms_timesOutAfter(IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handleData
         /*Codes_SRS_IOTHUBCLIENT_LL_02_039: [ "messageTimeout" - once IoTHubClientCore_LL_SendEventAsync is called the message shall timeout after value miliseconds. Value is a pointer to a tickcounter_ms_t. ]*/
         if (tickcounter_get_current_ms(handleData->tickCounter, &newEntry->ms_timesOutAfter) != 0)
         {
-            result = __FAILURE__;
+            result = MU_FAILURE;
             LogError("unable to get the current relative tickcount");
         }
         else
@@ -1999,7 +2004,7 @@ static void DoTimeouts(IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handleData)
         {
             IOTHUB_MESSAGE_LIST* fullEntry = containingRecord(currentItemInWaitingToSend, IOTHUB_MESSAGE_LIST, entry);
             /*Codes_SRS_IOTHUBCLIENT_LL_02_041: [ If more than value miliseconds have passed since the call to IoTHubClientCore_LL_SendEventAsync then the message callback shall be called with a status code of IOTHUB_CLIENT_CONFIRMATION_TIMEOUT. ]*/
-            if ((fullEntry->ms_timesOutAfter != 0) && (((nowTick - fullEntry->ms_timesOutAfter) / 1000) > fullEntry->message_timeout_value))
+            if ((fullEntry->ms_timesOutAfter != 0) && ((nowTick - fullEntry->ms_timesOutAfter) > fullEntry->message_timeout_value))
             {
                 PDLIST_ENTRY theNext = currentItemInWaitingToSend->Flink; /*need to save the next item, because the below operations are destructive*/
                 DList_RemoveEntryList(currentItemInWaitingToSend);
@@ -2255,7 +2260,7 @@ IOTHUB_CLIENT_RESULT IoTHubClientCore_LL_SetOption(IOTHUB_CLIENT_CORE_LL_HANDLE 
             if (percentage > 100)
             {
                 /*Codes_SRS_IOTHUBCLIENT_LL_10_036: [Calling IoTHubClientCore_LL_SetOption with value > 100 shall return `IOTHUB_CLIENT_ERRROR`. ]*/
-                LogError("The value of diag_sampling_percentage is out of range [0, 100]: %u", (unsigned int)percentage);
+                LogError("The value of diag_sampling_percentage is out of range [0, 100]: %u", percentage);
                 result = IOTHUB_CLIENT_ERROR;
             }
             else
@@ -2280,6 +2285,20 @@ IOTHUB_CLIENT_RESULT IoTHubClientCore_LL_SetOption(IOTHUB_CLIENT_CORE_LL_HANDLE 
             LogError("%s option being set with DONT_USE_UPLOADTOBLOB compiler switch", optionName);
             result = IOTHUB_CLIENT_ERROR;
 #endif /*DONT_USE_UPLOADTOBLOB*/
+        }
+        // OPTION_SAS_TOKEN_REFRESH_TIME is, but may be updated in the future
+        // if this becomes necessary
+        else if (strcmp(optionName, OPTION_SAS_TOKEN_REFRESH_TIME) == 0 || strcmp(optionName, OPTION_SAS_TOKEN_LIFETIME) == 0)
+        {
+            if (IoTHubClient_Auth_Set_SasToken_Expiry(handleData->authorization_module, *(size_t*)value) != 0)
+            {
+                LogError("Failed setting the Token Expiry time");
+                result = IOTHUB_CLIENT_ERROR;
+            }
+            else
+            {
+                result = IOTHUB_CLIENT_OK;
+            }
         }
         else
         {
@@ -2399,32 +2418,41 @@ IOTHUB_CLIENT_RESULT IoTHubClientCore_LL_GetTwinAsync(IOTHUB_CLIENT_CORE_LL_HAND
     }
     else
     {
-        GET_TWIN_CONTEXT* getTwinCtx;
-
-        if ((getTwinCtx = (GET_TWIN_CONTEXT*)malloc(sizeof(GET_TWIN_CONTEXT))) == NULL)
+        if (iotHubClientHandle->IoTHubTransport_Subscribe_DeviceTwin(iotHubClientHandle->transportHandle) != 0)
         {
-            LogError("Failed creating get-twin context");
+            LogError("Failure adding device twin data to queue");
             result = IOTHUB_CLIENT_ERROR;
         }
         else
         {
-            IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handleData = (IOTHUB_CLIENT_CORE_LL_HANDLE_DATA*)iotHubClientHandle;
+            GET_TWIN_CONTEXT* getTwinCtx;
 
-            getTwinCtx->callback = deviceTwinCallback;
-            getTwinCtx->context = userContextCallback;
-
-            // Codes_SRS_IOTHUBCLIENT_LL_09_012: [ IoTHubClientCore_LL_GetTwinAsync shall invoke IoTHubTransport_GetTwinAsync, passing `on_device_twin_report_received` and the user data as context  ]
-            if (handleData->IoTHubTransport_GetTwinAsync(handleData->deviceHandle, on_get_device_twin_completed, getTwinCtx) != IOTHUB_CLIENT_OK)
+            if ((getTwinCtx = (GET_TWIN_CONTEXT*)malloc(sizeof(GET_TWIN_CONTEXT))) == NULL)
             {
-                // Codes_SRS_IOTHUBCLIENT_LL_09_013: [ If IoTHubTransport_GetTwinAsync fails, `IoTHubClientCore_LL_GetTwinAsync` shall fail and return `IOTHUB_CLIENT_ERROR`. ]
-                LogError("Failed getting device twin document");
-                free(getTwinCtx);
+                LogError("Failed creating get-twin context");
                 result = IOTHUB_CLIENT_ERROR;
             }
             else
             {
-                // Codes_SRS_IOTHUBCLIENT_LL_09_014: [ If no errors occur IoTHubClientCore_LL_GetTwinAsync shall return `IOTHUB_CLIENT_OK`. ]
-                result = IOTHUB_CLIENT_OK;
+                IOTHUB_CLIENT_CORE_LL_HANDLE_DATA* handleData = (IOTHUB_CLIENT_CORE_LL_HANDLE_DATA*)iotHubClientHandle;
+
+                getTwinCtx->callback = deviceTwinCallback;
+                getTwinCtx->context = userContextCallback;
+
+                // Codes_SRS_IOTHUBCLIENT_LL_09_012: [ IoTHubClientCore_LL_GetTwinAsync shall invoke IoTHubTransport_GetTwinAsync, passing `on_device_twin_report_received` and the user data as context  ]
+                if (handleData->IoTHubTransport_GetTwinAsync(handleData->deviceHandle, on_get_device_twin_completed, getTwinCtx) != IOTHUB_CLIENT_OK)
+                {
+                    // Codes_SRS_IOTHUBCLIENT_LL_09_013: [ If IoTHubTransport_GetTwinAsync fails, `IoTHubClientCore_LL_GetTwinAsync` shall fail and return `IOTHUB_CLIENT_ERROR`. ]
+                    LogError("Failed getting device twin document");
+                    free(getTwinCtx);
+                    result = IOTHUB_CLIENT_ERROR;
+                }
+                else
+                {
+                    // Codes_SRS_IOTHUBCLIENT_LL_09_014: [ If no errors occur IoTHubClientCore_LL_GetTwinAsync shall return `IOTHUB_CLIENT_OK`. ]
+                    handleData->complete_twin_update_encountered = true;
+                    result = IOTHUB_CLIENT_OK;
+                }
             }
         }
     }
@@ -2915,7 +2943,7 @@ int IoTHubClientCore_LL_GetTransportCallbacks(TRANSPORT_CALLBACKS_INFO* transpor
     if (transport_cb == NULL)
     {
         LogError("Invalid parameter transport callback can not be NULL");
-        result = __FAILURE__;
+        result = MU_FAILURE;
     }
     else
     {

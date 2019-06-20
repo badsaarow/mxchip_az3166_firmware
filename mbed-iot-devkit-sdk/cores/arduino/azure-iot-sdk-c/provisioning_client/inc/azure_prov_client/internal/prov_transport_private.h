@@ -4,8 +4,8 @@
 #ifndef PROV_TRANSPORT_PRIVATE_H
 #define PROV_TRANSPORT_PRIVATE_H
 
-#include "azure_c_shared_utility/umock_c_prod.h"
-#include "azure_c_shared_utility/macro_utils.h"
+#include "umock_c/umock_c_prod.h"
+#include "azure_macro_utils/macro_utils.h"
 #include "azure_c_shared_utility/shared_util_options.h"
 #include "azure_c_shared_utility/buffer_.h"
 #include "azure_prov_client/prov_transport.h"
@@ -29,14 +29,14 @@ extern "C" {
         PROV_DEVICE_TRANSPORT_STATUS_ERROR,         \
         PROV_DEVICE_TRANSPORT_STATUS_DISABLED
 
-    DEFINE_ENUM(PROV_DEVICE_TRANSPORT_STATUS, PROV_DEVICE_TRANSPORT_STATUS_VALUES);
+    MU_DEFINE_ENUM(PROV_DEVICE_TRANSPORT_STATUS, PROV_DEVICE_TRANSPORT_STATUS_VALUES);
 
     #define PROV_DEVICE_TRANSPORT_ERROR_VALUE   \
         PROV_DEVICE_ERROR_KEY_FAIL,             \
         PROV_DEVICE_ERROR_KEY_UNAUTHORIZED,     \
         PROV_DEVICE_ERROR_MEMORY
 
-    DEFINE_ENUM(PROV_DEVICE_TRANSPORT_ERROR, PROV_DEVICE_TRANSPORT_ERROR_VALUE);
+    MU_DEFINE_ENUM(PROV_DEVICE_TRANSPORT_ERROR, PROV_DEVICE_TRANSPORT_ERROR_VALUE);
 
     typedef struct PROV_JSON_INFO_TAG
     {
